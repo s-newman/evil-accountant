@@ -1,3 +1,4 @@
+import json
 import pickle
 
 import numpy
@@ -5,11 +6,10 @@ from scipy import stats
 
 from evil_accountant.sbox import SBOX
 
-INPUT_FILE = 'traces.pickle'
 NUM_TRACES = 50
 
 
-def load_traces(filename):
+def load_pickled_traces(filename):
     """Pickled dictionary containing the known secret key at the 'key' key stored as an
     ndarray of byte values, an ndarray of power traces under the 'waves' key, and an
     ndarray of plaintexts under the 'plaintexts' key.
@@ -20,12 +20,22 @@ def load_traces(filename):
     return traces['key'], traces['waves'], traces['plaintexts']
 
 
-def main():
-    key, traces, plaintexts = load_traces(INPUT_FILE)
+def load_jsoned_traces(filename):
+    """same as above but without key and also JSON."""
+    with open(filename, 'r') as input_file:
+        traces = json.load(input_file)
 
-    # Limit traces because I don't think we need 6k+
-    traces = traces[:NUM_TRACES]
-    plaintexts = plaintexts[:NUM_TRACES]
+    return numpy.asarray([43, 126, 21, 22, 40, 174, 210, 166, 171, 247, 21, 136, 9, 207, 79, 60]), numpy.asarray(traces['traces']), numpy.asarray(traces['plaintexts'])
+
+
+def main():
+    #key, traces, plaintexts = load_pickled_traces('traces.pickle')
+    key, traces, plaintexts = load_jsoned_traces('traces.json')
+    print(numpy.shape(traces))
+
+    ## Limit traces because I don't think we need 6k+
+    #traces = traces[1000:1000+NUM_TRACES]
+    #plaintexts = plaintexts[1000:1000+NUM_TRACES]
 
     # This array will be populated by our key guesses
     key_guess = []
@@ -58,7 +68,8 @@ def main():
             correlations = []
             for idx in range(numpy.shape(traces)[1]):
                 measurements = numpy.asarray([trace[idx] for trace in traces])
-                correlations.append(stats.pearsonr(hamming_weights, measurements)[0])
+                r_val, _ = stats.pearsonr(hamming_weights, measurements)
+                correlations.append(abs(r_val))
 
             # Record the results for this subkey guess
             guess_results.append((subkey_guess, max(correlations)))
@@ -67,3 +78,6 @@ def main():
         guess_results.sort(key=lambda x: x[1], reverse=True)
         key_guess.append(guess_results[0][0])
         print(f'{hex(guess_results[0][0])}, {guess_results[0][1]}')
+
+    print([hex(x) for x in key])
+    print([hex(x) for x in key_guess])
