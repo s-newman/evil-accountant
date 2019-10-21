@@ -58,7 +58,7 @@ def main():
             correlations = []
             for idx in range(numpy.shape(traces)[1]):
                 measurements = numpy.asarray([trace[idx] for trace in traces])
-                correlations.append(stats.pearsonr(hamming_weights, measurements))
+                correlations.append(stats.pearsonr(hamming_weights, measurements)[0])
 
             # Record the results for this subkey guess
             guess_results.append((subkey_guess, max(correlations)))
@@ -66,4 +66,4 @@ def main():
         # The subkey guess with the highest correlation is our best bet
         guess_results.sort(key=lambda x: x[1], reverse=True)
         key_guess.append(guess_results[0][0])
-        print(hex(guess_results[0][0]))
+        print(f'{hex(guess_results[0][0])}, {guess_results[0][1]}')
