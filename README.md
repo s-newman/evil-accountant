@@ -9,7 +9,7 @@ Information for CTFd
 
 - **Title**: Evil Accountant Attack
 - **Author**: neon_spandex
-- **Flag**: TODO
+- **Flag**: RITSEC{K0rr3LA710n_CAN_50M371m35_1MpLY_cau5A710N_24544110ad75a4}
 
 In addition to the description below, the `traces.zip` file must be provided to
 the CTF participants.
@@ -18,7 +18,7 @@ the CTF participants.
 
 Your CPA sent you a message encrypted with 128-bit AES, but refuses to send you the key to decrypt it. A few days later, their maid sent you a strange JSON object in an email, and they CC'd someone named Pearson.
 
-Ciphertext: BVWlnPlS3zqxi5xdUGYsl+l8tn+T4yW/jKoPJMagGhE=
+Ciphertext: 5z+joNqYQhpXz/2Njz+/ePD8m8+A2S3ZZ5tWIvRw1ueq4cO9EYgvQjGKeJzFtIZF9hg9/2NGIFQqgDfwxNHUiQ==
 
 There was an issue with the traces, so you get three bytes of key for free:
 
