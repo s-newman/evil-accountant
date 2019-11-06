@@ -1,4 +1,5 @@
 import json
+from multiprocessing import Pool
 
 from scipy import stats
 
@@ -76,8 +77,9 @@ def get_key(traces, plaintexts):
 
     # Split up the key into 16 different 1-byte subkeys that will be determined
     # individually.
-    for subkey in range(16):
-        key.append(get_correct_subkey_byte(subkey, traces, plaintexts))
+    with Pool(processes=8) as pool:
+        args = [(x, traces, plaintexts) for x in range(16)]
+        key = pool.starmap(get_correct_subkey_byte, args)
         print(["%3.1f" % x[1] for x in key])
         print([hex(x[0]) for x in key])
 
@@ -87,6 +89,7 @@ def main():
     key, traces, plaintexts = load_jsoned_traces("traces.json")
     print([hex(x) for x in key])
     get_key(traces, plaintexts)
+    print([hex(x) for x in key])
 
 
 if __name__ == "__main__":
