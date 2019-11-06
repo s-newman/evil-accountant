@@ -36,7 +36,7 @@ def get_subkey_guess_correlation(subkey, byte_index, traces, plaintexts):
     for plaintext in plaintexts:
         addkey_output = plaintext[byte_index] ^ subkey
         subbytes_output = sbox_lookup(addkey_output)
-        modeled_usage.append(subbytes_output)
+        modeled_usage.append(power_model(subbytes_output))
 
     # Find the correlation coefficient between the modeled power usage and the actual
     # power usage for each data point in the traces (e.g., for point 1 in all traces,
