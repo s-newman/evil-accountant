@@ -1,83 +1,93 @@
 import json
-import pickle
 
-import numpy
 from scipy import stats
 
-from evil_accountant.sbox import SBOX
-
-NUM_TRACES = 50
-
-
-def load_pickled_traces(filename):
-    """Pickled dictionary containing the known secret key at the 'key' key stored as an
-    ndarray of byte values, an ndarray of power traces under the 'waves' key, and an
-    ndarray of plaintexts under the 'plaintexts' key.
-    """
-    with open(filename, 'rb') as input_file:
-        traces = pickle.load(input_file)
-
-    return traces['key'], traces['waves'], traces['plaintexts']
+from evil_accountant.sbox import sbox_lookup
 
 
 def load_jsoned_traces(filename):
     """same as above but without key and also JSON."""
-    with open(filename, 'r') as input_file:
+    with open(filename, "r") as input_file:
         traces = json.load(input_file)
 
-    return numpy.asarray([43, 126, 21, 22, 40, 174, 210, 166, 171, 247, 21, 136, 9, 207, 79, 60]), numpy.asarray(traces['traces']), numpy.asarray(traces['plaintexts'])
+    return (
+        [43, 126, 21, 22, 40, 174, 210, 166, 171, 247, 21, 136, 9, 207, 79, 60],
+        traces["traces"],
+        traces["plaintexts"],
+    )
+
+
+def power_model(intermediate_value):
+    # Hamming weight is used as power model - more 1s, more power usage
+    return bin(intermediate_value).count("1")
+
+
+def get_subkey_guess_correlation(subkey, byte_index, traces, plaintexts):
+    # A subkey is one byte
+    assert subkey >= 0 and subkey < 256
+    # The byte index is the index of the byte of key that is being guessed
+    assert byte_index >= 0 and byte_index < 15
+
+    # Store the output of our power usage model for each plaintext/trace pair
+    modeled_usage = []
+
+    # Compute the intermediate value for every plaintext and store the results of the
+    # power usage model
+    for plaintext in plaintexts:
+        addkey_output = plaintext[byte_index] ^ subkey
+        subbytes_output = sbox_lookup(addkey_output)
+        modeled_usage.append(subbytes_output)
+
+    # Find the correlation coefficient between the modeled power usage and the actual
+    # power usage for each data point in the traces (e.g., for point 1 in all traces,
+    # for point 2, etc.).
+    correlations = []
+    for data_point_idx in range(len(traces[0])):
+        measurements = [trace[data_point_idx] for trace in traces]
+        coefficient = stats.pearsonr(modeled_usage, measurements)
+        correlations.append(coefficient)
+
+    # We only return the maximum correlation coefficient of each data point. This
+    # eliminates noise in the trace from parts of the encryption unrelated to the
+    # intermediate value we're attacking.
+    return max(correlations)
+
+
+def get_correct_subkey_byte(byte_index, traces, plaintexts):
+    # The byte index is the index of the byte of key that is being guessed
+    assert byte_index >= 0 and byte_index < 15
+
+    # Find the subkey guess with the highest coefficent
+    max_coefficent = 0
+    best_subkey_guess = 0
+    for subkey_guess in range(256):
+        guess_coefficient = get_subkey_guess_correlation(
+            subkey_guess, byte_index, traces.plaintexts
+        )
+        if guess_coefficient > max_coefficent:
+            max_coefficent = guess_coefficient
+            best_subkey_guess = subkey_guess
+
+    return best_subkey_guess
+
+
+def get_key(traces, plaintexts):
+    key = []
+
+    # Split up the key into 16 different 1-byte subkeys that will be determined
+    # individually.
+    for subkey in range(16):
+        key.append(get_correct_subkey_byte(subkey, traces, plaintexts))
+
+    # Print the key!
+    print([hex(x) for x in key])
 
 
 def main():
-    #key, traces, plaintexts = load_pickled_traces('traces.pickle')
-    key, traces, plaintexts = load_jsoned_traces('traces.json')
-    print(numpy.shape(traces))
+    # Load the traces
+    key, traces, plaintexts = load_jsoned_traces("traces.json")
+    get_key()
 
-    ## Limit traces because I don't think we need 6k+
-    #traces = traces[1000:1000+NUM_TRACES]
-    #plaintexts = plaintexts[1000:1000+NUM_TRACES]
 
-    # This array will be populated by our key guesses
-    key_guess = []
-
-    print([hex(x) for x in key])
-
-    # We are splitting up the key into 16 different 1-byte subkeys that will be
-    # determined individually.
-    for subkey in range(16):
-        # Record each guess and it's highest correlation value
-        guess_results = []
-
-        # Every possible value of the byte has to be guessed [0, 255]
-        for subkey_guess in range(256):
-            # We are targeting the intermediate value generated after the first round's
-            # AddRoundKey and SubBytes operations. The Hamming Weight of this value will
-            # be used as a model for power usage.
-            hamming_weights = []
-
-            # Compute the hamming weight of the intermediate value for every plaintext
-            for plaintext in plaintexts:
-                subbytes_output = SBOX[plaintext[subkey] ^ subkey_guess]
-                hamming_weights.append(bin(subbytes_output).count('1'))
-
-            # Convert to a numpy array because it will be faster
-            hamming_weights = numpy.asarray(hamming_weights)
-
-            # Calculate the sample Pearson Correlation Coefficient between the model and
-            # the measurements for each data point in the traces
-            correlations = []
-            for idx in range(numpy.shape(traces)[1]):
-                measurements = numpy.asarray([trace[idx] for trace in traces])
-                r_val, _ = stats.pearsonr(hamming_weights, measurements)
-                correlations.append(abs(r_val))
-
-            # Record the results for this subkey guess
-            guess_results.append((subkey_guess, max(correlations)))
-
-        # The subkey guess with the highest correlation is our best bet
-        guess_results.sort(key=lambda x: x[1], reverse=True)
-        key_guess.append(guess_results[0][0])
-        print(f'{hex(guess_results[0][0])}, {guess_results[0][1]}')
-
-    print([hex(x) for x in key])
-    print([hex(x) for x in key_guess])
+if __name__ == "__main__":
+    main()
