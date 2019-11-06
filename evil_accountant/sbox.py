@@ -258,3 +258,7 @@ SBOX = (
     0xBB,
     0x16,
 )
+
+
+def sbox_lookup(input):
+    return SBOX[input]

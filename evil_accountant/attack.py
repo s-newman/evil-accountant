@@ -26,7 +26,7 @@ def get_subkey_guess_correlation(subkey, byte_index, traces, plaintexts):
     # A subkey is one byte
     assert subkey >= 0 and subkey < 256
     # The byte index is the index of the byte of key that is being guessed
-    assert byte_index >= 0 and byte_index < 15
+    assert byte_index >= 0 and byte_index < 16
 
     # Store the output of our power usage model for each plaintext/trace pair
     modeled_usage = []
@@ -45,7 +45,7 @@ def get_subkey_guess_correlation(subkey, byte_index, traces, plaintexts):
     for data_point_idx in range(len(traces[0])):
         measurements = [trace[data_point_idx] for trace in traces]
         coefficient = stats.pearsonr(modeled_usage, measurements)
-        correlations.append(coefficient)
+        correlations.append(abs(coefficient[0]))
 
     # We only return the maximum correlation coefficient of each data point. This
     # eliminates noise in the trace from parts of the encryption unrelated to the
@@ -55,14 +55,14 @@ def get_subkey_guess_correlation(subkey, byte_index, traces, plaintexts):
 
 def get_correct_subkey_byte(byte_index, traces, plaintexts):
     # The byte index is the index of the byte of key that is being guessed
-    assert byte_index >= 0 and byte_index < 15
+    assert byte_index >= 0 and byte_index < 16
 
     # Find the subkey guess with the highest coefficent
     max_coefficent = 0
     best_subkey_guess = 0
     for subkey_guess in range(256):
         guess_coefficient = get_subkey_guess_correlation(
-            subkey_guess, byte_index, traces.plaintexts
+            subkey_guess, byte_index, traces, plaintexts
         )
         if guess_coefficient > max_coefficent:
             max_coefficent = guess_coefficient
@@ -78,15 +78,14 @@ def get_key(traces, plaintexts):
     # individually.
     for subkey in range(16):
         key.append(get_correct_subkey_byte(subkey, traces, plaintexts))
-
-    # Print the key!
-    print([hex(x) for x in key])
+        print([hex(x) for x in key])
 
 
 def main():
     # Load the traces
     key, traces, plaintexts = load_jsoned_traces("traces.json")
-    get_key()
+    print([hex(x) for x in key])
+    get_key(traces, plaintexts)
 
 
 if __name__ == "__main__":
