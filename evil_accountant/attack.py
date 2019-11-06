@@ -68,7 +68,7 @@ def get_correct_subkey_byte(byte_index, traces, plaintexts):
             max_coefficent = guess_coefficient
             best_subkey_guess = subkey_guess
 
-    return best_subkey_guess
+    return best_subkey_guess, max_coefficent * 100
 
 
 def get_key(traces, plaintexts):
@@ -78,7 +78,8 @@ def get_key(traces, plaintexts):
     # individually.
     for subkey in range(16):
         key.append(get_correct_subkey_byte(subkey, traces, plaintexts))
-        print([hex(x) for x in key])
+        print(["%3.1f" % x[1] for x in key])
+        print([hex(x[0]) for x in key])
 
 
 def main():
