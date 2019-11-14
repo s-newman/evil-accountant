@@ -80,16 +80,16 @@ def get_key(traces, plaintexts):
     with Pool(processes=8) as pool:
         args = [(x, traces, plaintexts) for x in range(16)]
         key = pool.starmap(get_correct_subkey_byte, args)
-        print(f'Coefficients: {["%4.3f" % x[1] for x in key]}')
-        print(f'Key guess:    {[hex(x[0]) for x in key]}')
+        print(f'Coefficients: {["%3.2f" % x[1] for x in key]}')
+        print(f'Key guess:    {["0x%02x" % x[0] for x in key]}')
 
 
 def main():
     # Load the traces
     key, traces, plaintexts = load_jsoned_traces("traces.json")
-    print(f'Actual key:   {[hex(x) for x in key]}')
+    print(f'Actual key:   {["0x%02x" % x for x in key]}')
     get_key(traces, plaintexts)
-    print(f'Actual key:   {[hex(x) for x in key]}')
+    print(f'Actual key:   {["0x%02x" % x for x in key]}')
 
 
 if __name__ == "__main__":
