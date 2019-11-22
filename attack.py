@@ -2,6 +2,7 @@
 import argparse
 import json
 from multiprocessing import Pool
+import warnings
 from zipfile import ZipFile
 
 from scipy import stats
@@ -88,13 +89,15 @@ def get_subkey_guess_correlation(subkey, byte_index, traces, plaintexts):
     correlations = []
     for data_point_idx in range(len(traces[0])):
         measurements = [trace[data_point_idx] for trace in traces]
-        coefficient = stats.pearsonr(modeled_usage, measurements)
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            coefficient = stats.pearsonr(modeled_usage, measurements)
         correlations.append(abs(coefficient[0]))
 
     # We only return the maximum correlation coefficient of each data point. This
     # eliminates noise in the trace from parts of the encryption unrelated to the
     # intermediate value we're attacking.
-    return max(correlations)
+    return max(correlations), subkey
 
 
 def get_correct_subkey_byte(processes, byte_index, traces, plaintexts):
@@ -102,17 +105,12 @@ def get_correct_subkey_byte(processes, byte_index, traces, plaintexts):
     assert byte_index >= 0 and byte_index < 16
 
     # Find the subkey guess with the highest coefficent
-    max_coefficent = 0
-    best_subkey_guess = 0
-    for subkey_guess in range(256):
-        guess_coefficient = get_subkey_guess_correlation(
-            subkey_guess, byte_index, traces, plaintexts
-        )
-        if guess_coefficient > max_coefficent:
-            max_coefficent = guess_coefficient
-            best_subkey_guess = subkey_guess
+    with Pool(processes=processes) as pool:
+        args = [(guess, byte_index, traces, plaintexts) for guess in range(256)]
+        results = pool.starmap(get_subkey_guess_correlation, args)
+    correct = sorted(results, reverse=True, key=lambda x: x[0])[0]
 
-    return best_subkey_guess, max_coefficent
+    return correct[1], correct[0]
 
 
 def get_key(processes, traces, plaintexts):
