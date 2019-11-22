@@ -100,14 +100,13 @@ def get_subkey_guess_correlation(subkey, byte_index, traces, plaintexts):
     return max(correlations), subkey
 
 
-def get_correct_subkey_byte(processes, byte_index, traces, plaintexts):
+def get_correct_subkey_byte(pool, byte_index, traces, plaintexts):
     # The byte index is the index of the byte of key that is being guessed
     assert byte_index >= 0 and byte_index < 16
 
     # Find the subkey guess with the highest coefficent
-    with Pool(processes=processes) as pool:
-        args = [(guess, byte_index, traces, plaintexts) for guess in range(256)]
-        results = pool.starmap(get_subkey_guess_correlation, args)
+    args = [(guess, byte_index, traces, plaintexts) for guess in range(256)]
+    results = pool.starmap(get_subkey_guess_correlation, args)
     correct = sorted(results, reverse=True, key=lambda x: x[0])[0]
 
     return correct[1], correct[0]
@@ -118,10 +117,12 @@ def get_key(processes, traces, plaintexts):
 
     # Split up the key into 16 different 1-byte subkeys that will be determined
     # individually.
+    pool = Pool(processes=processes)
     for idx in range(16):
-        key.append(get_correct_subkey_byte(processes, idx, traces, plaintexts))
+        key.append(get_correct_subkey_byte(pool, idx, traces, plaintexts))
         print(f'Coefficients: {["%3.2f" % x[1] for x in key]}')
         print(f'Key guess:    {["0x%02x" % x[0] for x in key]}')
+    pool.close()
 
 
 def main():
