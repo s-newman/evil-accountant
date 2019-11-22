@@ -1,5 +1,8 @@
+#!/usr/bin/env python
+import argparse
 import json
 from multiprocessing import Pool
+from zipfile import ZipFile
 
 from scipy import stats
 
@@ -27,14 +30,32 @@ SBOX = [
 ]
 # fmt: on
 
+KEY = [43, 126, 21, 22, 40, 174, 210, 166, 171, 247, 21, 136, 9, 207, 79, 60]
 
-def load_jsoned_traces(filename):
-    """same as above but without key and also JSON."""
-    with open(filename, "r") as input_file:
-        traces = json.load(input_file)
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "zipfile",
+        help="Filename of the challenge zipfile containing the JSON blob of traces.",
+    )
+    parser.add_argument(
+        "-p",
+        "--processes",
+        type=int,
+        help="The number of processes to spawn for multiprocessing. Defaults to 8.",
+        default=8,
+    )
+    return parser.parse_args()
+
+
+def load_traces(filename):
+    with ZipFile(filename, "r") as zipfile:
+        with zipfile.open('traces.json') as tracefile:
+            traces = json.load(tracefile)
 
     return (
-        [43, 126, 21, 22, 40, 174, 210, 166, 171, 247, 21, 136, 9, 207, 79, 60],
+        KEY,
         traces["traces"],
         traces["plaintexts"],
     )
@@ -76,7 +97,7 @@ def get_subkey_guess_correlation(subkey, byte_index, traces, plaintexts):
     return max(correlations)
 
 
-def get_correct_subkey_byte(byte_index, traces, plaintexts):
+def get_correct_subkey_byte(processes, byte_index, traces, plaintexts):
     # The byte index is the index of the byte of key that is being guessed
     assert byte_index >= 0 and byte_index < 16
 
@@ -94,23 +115,23 @@ def get_correct_subkey_byte(byte_index, traces, plaintexts):
     return best_subkey_guess, max_coefficent
 
 
-def get_key(traces, plaintexts):
+def get_key(processes, traces, plaintexts):
     key = []
 
     # Split up the key into 16 different 1-byte subkeys that will be determined
     # individually.
-    with Pool(processes=8) as pool:
-        args = [(x, traces, plaintexts) for x in range(16)]
-        key = pool.starmap(get_correct_subkey_byte, args)
+    for idx in range(16):
+        key.append(get_correct_subkey_byte(processes, idx, traces, plaintexts))
         print(f'Coefficients: {["%3.2f" % x[1] for x in key]}')
         print(f'Key guess:    {["0x%02x" % x[0] for x in key]}')
 
 
 def main():
+    args = parse_args()
     # Load the traces
-    key, traces, plaintexts = load_jsoned_traces("traces.json")
+    key, traces, plaintexts = load_traces(args.zipfile)
     print(f'Actual key:   {["0x%02x" % x for x in key]}')
-    get_key(traces, plaintexts)
+    get_key(args.processes, traces, plaintexts)
     print(f'Actual key:   {["0x%02x" % x for x in key]}')
 
 
